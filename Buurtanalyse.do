@@ -60,7 +60,7 @@
 	
 
 ********************************************************************************
-* Analysis 1: Density of foundations *  
+* Analysis 1: Density of foundations (stichtingen) *  
 ********************************************************************************
 
 * Separate migration background variables * 
@@ -165,9 +165,49 @@
 	estimates clear
 	
 	
+* Outlier check *
+
+/* Note: Zuidas seems to present an outlier in stichting_density, as it has a relatively high density of ~565, compared to the other neighbourhoods; the second-highest density is ~166. We therefore run the same models for stichting_density again without Zuidas to check if the effect sizes are affected significantly.*/ 
+	
+	preserve 
+	keep if bc_code != "K23"
+
+// Add immigration variables
+	reg stichting_density imm_NW imm_W
+	eststo Immigration1A_K23
+
+// Add age variables
+	reg stichting_density age_18t26 age_66plus
+	eststo Age1A_K23
+
+// Add unemployment variables
+	reg stichting_density unempl
+	eststo Unemployment1A_K23
+
+// Add education variables
+	reg stichting_density edu_low edu_high
+	eststo Education1A_K23
+	
+// Full model 
+	reg stichting_density imm_NW imm_W age_18t26 age_66plus unempl edu_low /// 
+	    edu_high
+	eststo Full1A_K23
+
+// Plot 
+	coefplot Immigration1A_K23 Age1A_K23 Unemployment1A_K23 Education1A_K23 Full1A_K23, /// 
+	drop(_cons) scheme(uncluttered) xline(0)
+	
+// Export 
+	graph export "$figures/Stichting-NW+W-imm-geenZuidas.png", replace	
+	
+// Clear stored estimates
+	estimates clear
+	
+	restore 
+	
 	
 ********************************************************************************
-* Analysis 2: Density of associations *  
+* Analysis 2: Density of associations (verenigingen) *  
 ********************************************************************************
 
 * Separate migration background variables * 
@@ -236,7 +276,7 @@
 
 // Clear stored estimates
 	estimates clear
-
+	
 	
 * Migration background * 
 
@@ -274,7 +314,7 @@
 
 	
 ********************************************************************************
-* Analysis 3: Density of leisure organisations *  
+* Analysis 3: Density of leisure organisations (vrijetijds(buurt)organisaties) *  
 ********************************************************************************
 
 * Separate migration background variables * 
@@ -377,3 +417,107 @@
 
 // Clear stored estimates
 	estimates clear
+	
+
+* Outlier check *
+
+/* Note: Sloterdijk seems to present an outlier in leisure_density, as it has a relatively high density of ~370, compared to the other neighbourhoods; the second-highest density is ~250. We therefore run the same models for leisure_density again without Sloterdijk to check if the effect sizes are affected significantly.*/	
+
+	preserve
+	keep if bc_code != "E36"
+
+// Add immigration variables
+	reg leisure_density imm_NW imm_W
+	eststo Immigration3A_E36
+
+// Add age variables
+	reg leisure_density age_18t26 age_66plus
+	eststo Age3A_E36
+
+// Add unemployment variables
+	reg leisure_density unempl
+	eststo Unemployment3A_E36
+
+// Add education variables
+	reg leisure_density edu_low edu_high
+	eststo Education3A_E36
+	
+// Full model 
+	reg leisure_density imm_NW imm_W age_18t26 age_66plus unempl edu_low ///
+	    edu_high
+	eststo Full3A_E36
+
+// Plot 
+	coefplot Immigration3A_E36 Age3A_E36 Unemployment3A_E36 Education3A_E36 Full3A_E36, /// 
+	drop(_cons) scheme(uncluttered) xline(0)
+	
+// Export 
+	graph export "$figures/Leisure-NW+W-imm-geenSloterdijk.png", replace	
+
+// Clear stored estimates
+	estimates clear
+
+	restore
+
+
+	
+********************************************************************************
+* Map visualisation *  
+********************************************************************************
+
+/* Notes: for the map visualisation, need shapefiles (.shp and .dbf) defining 
+the geographical areas, here the Amsterdam municipal 'gebiedsindeling'. We used 
+the 2015 gebiedsindeling. First extract coordinates from shapefiles, merge with 
+data to be visualised, then use grmap (needs to be activated) to visualise in a 
+map */
+
+
+	ssc install shp2dta
+
+	cd "/Users/Maartje/Desktop/LJA/Buurtanalyse/Kaarten maken" 
+
+// make databases out of shapefile 
+	shp2dta using "/Users/Maartje/Desktop/LJA/Buurtanalyse/Kaarten maken/bc2015def_region.shp", database(db15) coordinates(coord15) replace
+
+// merge buurtdata + geodata
+	rename bc_code BC2015
+	merge m:m BC2015 using "/Users/Maartje/Desktop/LJA/Buurtanalyse/Kaarten maken/db15.dta", gen(m3)
+	/* 5 neighbourhoods are not matched; present in the geodata but not in the 
+	 buurtanalyse data */
+	
+	drop _ID
+	merge m:m BC2015 using "/Users/Maartje/Desktop/LJA/Buurtanalyse/Kaarten maken/db15.dta", gen(m4)
+	/* all 99 neighbourhoods are matched (so including the 5 that should not be 
+	included in data, bc e.g. industrial) */
+	
+	collapse _ID imm_autoch imm_NW imm_W age_18t26 age_66plus edu_low edu_high unempl  stichting_density vereniging_density leisure_density, by(BC)
+	
+	
+	shp2dta using "/Users/Maartje/Desktop/LJA/Buurtanalyse/Kaarten maken/bc2015def_region.shp", database(db15) coordinates(coord15) replace
+	drop if _ID==. // not strictly necessary here because all were matched
+	spset _ID
+	spset, modify shpfile(coord) 
+	
+
+* Density of foundations (stichtingen) *
+
+	grmap, activate
+	format stichting_density %12.1f
+	grmap stichting_density,  clmethod(quantile) clnumber(6) ndfcolor(gs12) legstyle(2) fcolor(PuBu) legtitle("Stichtingsdichtheid (per 1000 inwoners)")
+	
+	graph export "$figures/map-stichtingen.png", replace 
+	
+* Density of leisure organisations (vrijetijdsorganisaties) *  	
+
+	format leisure_density %12.1f
+	grmap leisure_density,  clmethod(quantile) clnumber(6) ndfcolor(gs12) legstyle(2) fcolor(PuBu) legtitle("Vrijetijdsorganisatiesdichtheid (per 1000 inwoners)")
+	
+	graph export "$figures/map-leisure.png", replace 
+
+
+
+
+	
+	
+	
+	
