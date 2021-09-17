@@ -514,7 +514,10 @@ map */
 	
 	graph export "$figures/map-leisure.png", replace 
 
+* Map without legend for front page *
 
+	grmap stichting_density,  clmethod(quantile) clnumber(6) ndfcolor(gs12) fcolor(PuBu) legend(off) 
+	graph export "$figures/front-map.png", replace 
 
 
 	
